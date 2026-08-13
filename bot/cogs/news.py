@@ -25,7 +25,9 @@ class NewsCog(commands.Cog):
             news_list = await self.bot.news_service.fetch_news()
 
             if not news_list:
-                print("Aucune nouvelle actualité.")
+
+                print("📰 Aucune nouvelle actualité.")
+
                 return
 
             channel_id = self.bot.news_channel_id
@@ -33,7 +35,7 @@ class NewsCog(commands.Cog):
             if not channel_id:
 
                 print(
-                    "⚠️ NEWS_CHANNEL_ID n'est pas configuré."
+                    "❌ NEWS_CHANNEL_ID n'est pas configuré."
                 )
 
                 return
@@ -45,7 +47,59 @@ class NewsCog(commands.Cog):
             if not channel:
 
                 print(
-                    f"⚠️ Salon Discord {channel_id} introuvable."
+                    f"❌ Salon Discord {channel_id} introuvable."
+                )
+
+                return
+
+            # Vérification des permissions
+            permissions = channel.permissions_for(
+                channel.guild.me
+            )
+
+            print(
+                f"🔎 Vérification permissions du salon : "
+                f"#{channel.name}"
+            )
+
+            print(
+                f"   Voir le salon       : {permissions.view_channel}"
+            )
+
+            print(
+                f"   Envoyer messages    : {permissions.send_messages}"
+            )
+
+            print(
+                f"   Intégrer liens      : {permissions.embed_links}"
+            )
+
+            print(
+                f"   Lire historique     : {permissions.read_message_history}"
+            )
+
+            if not permissions.view_channel:
+
+                print(
+                    "❌ Le bot ne peut pas voir ce salon."
+                )
+
+                return
+
+            if not permissions.send_messages:
+
+                print(
+                    "❌ Le bot ne peut pas envoyer de messages "
+                    "dans ce salon."
+                )
+
+                return
+
+            if not permissions.embed_links:
+
+                print(
+                    "❌ Le bot ne peut pas intégrer les liens "
+                    "dans ce salon."
                 )
 
                 return
@@ -66,18 +120,29 @@ class NewsCog(commands.Cog):
                     text=f"Source : {news['source']}"
                 )
 
-                await channel.send(
-                    embed=embed
-                )
+                try:
 
-                self.bot.news_service.mark_as_sent(
-                    news
-                )
+                    await channel.send(
+                        embed=embed
+                    )
 
-                print(
-                    f"🆕 Actualité envoyée : "
-                    f"{news['title']}"
-                )
+                    self.bot.news_service.mark_as_sent(
+                        news
+                    )
+
+                    print(
+                        f"🆕 Actualité envoyée : "
+                        f"{news['title']}"
+                    )
+
+                except discord.Forbidden:
+
+                    print(
+                        "❌ Discord refuse l'envoi du message "
+                        "dans le salon."
+                    )
+
+                    return
 
         except Exception as error:
 
