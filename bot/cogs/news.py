@@ -21,11 +21,11 @@ class NewsCog(commands.Cog):
             for news in reversed(news_list):
                 category = news.get("category", "news")
                 channel_id_str = self.bot.channels_config.get(category)
-                
+
                 # Sécurité : si un salon spécifique n'est pas trouvé, on rabat sur "news"
                 if not channel_id_str:
                     channel_id_str = self.bot.channels_config.get("news")
-                
+
                 if not channel_id_str:
                     print("⚠️ Aucun salon de destination configuré.")
                     return
@@ -49,13 +49,24 @@ class NewsCog(commands.Cog):
                     emoji = "📰"
                     label = "Actualité"
 
+                # Personnalisation de la description (on utilise le résumé traduit s'il existe)
+                if news['summary']:
+                    final_description = f"**{label}**\n\n{news['summary']}"
+                else:
+                    final_description = f"Une nouvelle publication de type **{label}** est disponible !"
+
                 embed = discord.Embed(
                     title=f"{emoji} {news['title']}",
                     url=news["url"],
-                    description=f"Une nouvelle publication de type **{label}** est disponible !",
+                    description=final_description,
                     color=color,
                     timestamp=discord.utils.utcnow()
                 )
+
+                # Si une image a été trouvée, on l'ajoute en grande image
+                if news.get("image"):
+                    embed.set_image(url=news["image"])
+
                 embed.set_footer(text=f"Source : {news['source']}")
 
                 await channel.send(embed=embed)

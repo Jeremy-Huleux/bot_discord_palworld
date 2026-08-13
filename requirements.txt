@@ -1,4 +1,6 @@
 discord.py
 python-dotenv
-aiohttp
 feedparser
+aiohttp
+deep-translator
+beautifulsoup4
