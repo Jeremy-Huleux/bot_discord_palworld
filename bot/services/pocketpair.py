@@ -21,7 +21,10 @@ class PocketpairService:
         self,
         session,
         url,
-        title=""
+        raw_title="",
+        title="",
+        published="",
+        category=""
     ):
         try:
 
@@ -89,65 +92,169 @@ class PocketpairService:
 
 #debut modif
 
+            # =========================================================
+            # EXTRACTION DU CONTENU DE L'ARTICLE
+            # =========================================================
+
             content = ""
 
             selectors = [
                 "article",
                 ".entry-content",
                 ".post-content",
-                ".article-content"
+                ".article-content",
+                "main"
             ]
 
             for selector in selectors:
 
-                element = soup.select_one(
-                    selector
-                )
+                element = soup.select_one(selector)
 
                 if not element:
                     continue
 
-                # Supprimer les éléments inutiles
+                # -----------------------------------------------------
+                # Supprimer les éléments qui ne font pas partie
+                # du contenu de l'article
+                # -----------------------------------------------------
+
                 for unwanted in element.select(
                     "nav, header, footer, script, style, "
                     ".breadcrumb, .breadcrumbs, "
-                    ".share, .social, .related"
+                    ".share, .social, .related, "
+                    ".comments, .comment, "
+                    ".author, .post-meta"
                 ):
                     unwanted.decompose()
 
-                content = element.get_text(
+                # -----------------------------------------------------
+                # Récupération du texte complet
+                # -----------------------------------------------------
+
+                text = element.get_text(
                     " ",
                     strip=True
                 )
 
-                if len(content) > 100:
-                    break
+                # -----------------------------------------------------
+                # Nettoyage
+                # -----------------------------------------------------
 
-            # Fallback sur <main>
-            if not content:
+                text = re.sub(
+                    r"\s+",
+                    " ",
+                    text
+                ).strip()
 
-                element = soup.select_one(
-                    "main"
+                # Supprimer les URLs
+                text = re.sub(
+                    r"https?://\S+",
+                    "",
+                    text
                 )
 
-                if element:
+                text = re.sub(
+                    r"\s+",
+                    " ",
+                    text
+                ).strip()
 
-                    for unwanted in element.select(
-                        "nav, header, footer, script, style"
-                    ):
-                        unwanted.decompose()
+                # -----------------------------------------------------
+                # Retirer les informations de l'en-tête de l'article
+                # -----------------------------------------------------
+
+                # Date
+                if published:
+                    text = text.replace(
+                        published,
+                        "",
+                        1
+                    )
+
+                # Catégorie
+                category_texts = [
+                    "important notice",
+                    "event information",
+                    "pitch your game",
+                    "update",
+                    "news"
+                ]
+
+                for category_text in category_texts:
+
+                    text = re.sub(
+                        rf"^\s*{re.escape(category_text)}\s*",
+                        "",
+                        text,
+                        flags=re.IGNORECASE
+                    )
+
+                # Titre
+                if raw_title:
+
+                    cleaned_raw_title = re.sub(
+                        r"\s+",
+                        " ",
+                        raw_title
+                    ).strip()
+
+                    if cleaned_raw_title:
+
+                        text = text.replace(
+                            cleaned_raw_title,
+                            "",
+                            1
+                        ).strip()
+
+                # -----------------------------------------------------
+                # Nettoyage final
+                # -----------------------------------------------------
+
+                text = re.sub(
+                    r"\s+",
+                    " ",
+                    text
+                ).strip()
+
+                if len(text) > 30:
+
+                    content = text
+                    break
+
+
+            # =========================================================
+            # FALLBACK
+            # =========================================================
+
+            if not content:
+
+                element = soup.select_one("main")
+
+                if element:
 
                     content = element.get_text(
                         " ",
                         strip=True
                     )
 
-            # Nettoyage
-            content = re.sub(
-                r"\s+",
-                " ",
-                content
-            ).strip()
+                    content = re.sub(
+                        r"\s+",
+                        " ",
+                        content
+                    ).strip()
+
+
+            # =========================================================
+            # LIMITATION DU RÉSUMÉ
+            # =========================================================
+
+            if len(content) > 500:
+
+                content = content[:500].rsplit(
+                    " ",
+                    1
+                )[0] + "..."
+
 #fin modif
 
             # Nettoyage
@@ -175,7 +282,7 @@ class PocketpairService:
             # Retirer les catégories affichées avant le contenu
             content = re.sub(
                 r"^(News|Update|Important Notice|"
-                r"Event Information|Palworld)\s+",
+                r"Event Information)\s+",
                 "",
                 content,
                 flags=re.IGNORECASE
@@ -444,6 +551,7 @@ class PocketpairService:
                     # ARTICLE
                     # =========================================
 
+
                     print(
                         f"🔎 Lecture article Pocketpair : "
                         f"{title}"
@@ -453,9 +561,13 @@ class PocketpairService:
                         await self.extract_article_details(
                             session,
                             url,
-                            title
+                            raw_title,
+                            title,
+                            published,
+                            category
                         )
                     )
+
                     results.append(
                         {
                             "guid": guid,
