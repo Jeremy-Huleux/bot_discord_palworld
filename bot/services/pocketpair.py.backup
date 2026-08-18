@@ -1,5 +1,4 @@
 import re
-import asyncio
 import aiohttp
 
 from bs4 import BeautifulSoup
@@ -17,26 +16,23 @@ class PocketpairService:
     def __init__(self, database):
         self.database = database
 
-    async def extract_article_details(
-        self,
-        session,
-        url,
-        title=""
-    ):
-        try:
+    async def fetch_article_details(self, session, url):
+        """
+        Récupère le contenu et l'image principale
+        d'un article Pocketpair.
+        """
 
+        try:
             async with session.get(
                 url,
                 timeout=aiohttp.ClientTimeout(total=20)
             ) as response:
 
                 if response.status != 200:
-
                     print(
-                        f"⚠️ Pocketpair article HTTP "
+                        f"⚠️ Article Pocketpair HTTP "
                         f"{response.status} : {url}"
                     )
-
                     return "", ""
 
                 html = await response.text()
@@ -46,171 +42,112 @@ class PocketpairService:
                 "html.parser"
             )
 
-            # =================================================
-            # IMAGE
-            # =================================================
+            # -------------------------------------------------
+            # IMAGE PRINCIPALE
+            # -------------------------------------------------
 
             image_url = ""
 
+            # OpenGraph : généralement la meilleure source
             og_image = soup.find(
                 "meta",
                 property="og:image"
             )
 
-            if og_image:
-
-                image_url = og_image.get(
-                    "content",
-                    ""
-                )
-
-            # Fallback : première image
-            if not image_url:
-
-                img = soup.find("img")
-
-                if img:
-
-                    image_url = img.get(
-                        "src",
-                        ""
-                    )
-
-            if image_url:
-
+            if og_image and og_image.get("content"):
                 image_url = urljoin(
                     url,
-                    image_url
+                    og_image["content"]
                 )
 
-            # =================================================
-            # CONTENU
-            # =================================================
+            # Fallback : première image de l'article
+            if not image_url:
 
-#debut modif
-
-            content = ""
-
-            selectors = [
-                "article",
-                ".entry-content",
-                ".post-content",
-                ".article-content"
-            ]
-
-            for selector in selectors:
-
-                element = soup.select_one(
-                    selector
+                article = soup.find(
+                    "article"
                 )
 
-                if not element:
-                    continue
+                if article:
 
-                # Supprimer les éléments inutiles
-                for unwanted in element.select(
-                    "nav, header, footer, script, style, "
-                    ".breadcrumb, .breadcrumbs, "
-                    ".share, .social, .related"
-                ):
-                    unwanted.decompose()
-
-                content = element.get_text(
-                    " ",
-                    strip=True
-                )
-
-                if len(content) > 100:
-                    break
-
-            # Fallback sur <main>
-            if not content:
-
-                element = soup.select_one(
-                    "main"
-                )
-
-                if element:
-
-                    for unwanted in element.select(
-                        "nav, header, footer, script, style"
-                    ):
-                        unwanted.decompose()
-
-                    content = element.get_text(
-                        " ",
-                        strip=True
+                    img = article.find(
+                        "img"
                     )
 
-            # Nettoyage
-            content = re.sub(
-                r"\s+",
-                " ",
-                content
-            ).strip()
-#fin modif
+                    if img and img.get("src"):
 
-            # Nettoyage
-            content = re.sub(
-                r"\s+",
-                " ",
-                content
-            ).strip()
+                        image_url = urljoin(
+                            url,
+                            img["src"]
+                        )
 
-#debut modif 2
+            # -------------------------------------------------
+            # CONTENU
+            # -------------------------------------------------
 
-            # =================================================
-            # SUPPRESSION DES INFORMATIONS DE HEADER
-            # =================================================
-
-            if published := re.search(
-                r"\b20\d{2}\.\d{2}\.\d{2}\b",
-                content
-            ):
-
-                content = content[
-                    published.end():
-                ].strip()
-
-            # Retirer les catégories affichées avant le contenu
-            content = re.sub(
-                r"^(News|Update|Important Notice|"
-                r"Event Information|Palworld)\s+",
-                "",
-                content,
-                flags=re.IGNORECASE
+            article = soup.find(
+                "article"
             )
 
-            # Retirer le titre s'il est répété au début
+            if not article:
 
-            title_text = title
-
-            if title_text and content.lower().startswith(
-                title_text.lower()
-            ):
-
-                content = content[
-                    len(title_text):
-                ].strip()
-
-#fin modif 2
-
-            # Éviter les textes énormes
-            if len(content) > 500:
-
-                content = (
-                    content[:500]
-                    .rsplit(" ", 1)[0]
-                    + "..."
+                # Fallbacks possibles du site
+                article = (
+                    soup.find(
+                        class_=re.compile(
+                            r"entry-content|post-content|article-content",
+                            re.IGNORECASE
+                        )
+                    )
                 )
 
-            return content, image_url
+            if not article:
+                return "", image_url
+
+            # Supprimer les éléments inutiles
+            for element in article.find_all(
+                [
+                    "script",
+                    "style",
+                    "nav",
+                    "footer",
+                    "form"
+                ]
+            ):
+                element.decompose()
+
+            text = article.get_text(
+                separator=" ",
+                strip=True
+            )
+
+            # Nettoyage
+            text = re.sub(
+                r"\s+",
+                " ",
+                text
+            ).strip()
+
+            # -------------------------------------------------
+            # RESUME
+            # -------------------------------------------------
+
+            # Discord Embed.description max = 4096 caractères.
+            # On garde un extrait raisonnable.
+            if len(text) > 700:
+                summary = text[:700].rsplit(
+                    " ",
+                    1
+                )[0] + "..."
+            else:
+                summary = text
+
+            return summary, image_url
 
         except Exception as error:
 
             print(
-                f"⚠️ Erreur lecture article Pocketpair : "
-                f"{error}"
+                f"⚠️ Erreur détails Pocketpair "
+                f"{url} : {error}"
             )
 
             return "", ""
@@ -228,23 +165,17 @@ class PocketpairService:
 
         try:
 
-            # =================================================
-            # UNE SEULE SESSION POUR TOUTE LA REQUÊTE
-            # =================================================
-
             async with aiohttp.ClientSession(
                 headers=headers
             ) as session:
 
-                # =============================================
-                # PAGE DES NEWS
-                # =============================================
+                # =================================================
+                # PAGE LISTE POCKETPAIR
+                # =================================================
 
                 async with session.get(
                     POCKETPAIR_URL,
-                    timeout=aiohttp.ClientTimeout(
-                        total=20
-                    )
+                    timeout=aiohttp.ClientTimeout(total=20)
                 ) as response:
 
                     if response.status != 200:
@@ -263,11 +194,11 @@ class PocketpairService:
                     "html.parser"
                 )
 
-                seen_urls = set()
+                # =================================================
+                # RECHERCHE DES ARTICLES
+                # =================================================
 
-                # =============================================
-                # PARCOURS DES ARTICLES
-                # =============================================
+                seen_urls = set()
 
                 for link in soup.find_all(
                     "a",
@@ -284,18 +215,18 @@ class PocketpairService:
                         href
                     )
 
-                    # -----------------------------------------
-                    # URL ARTICLE
-                    # -----------------------------------------
-
+                    # Un vrai article doit être
+                    # sous /game-news/
                     if "/game-news/" not in url:
                         continue
 
+                    # Ne pas prendre la page principale
                     if url.rstrip("/") == (
                         "https://www.pocketpair.jp/en/game-news"
                     ):
                         continue
 
+                    # Ne pas prendre les pages catégories
                     if "category_game" in url:
                         continue
 
@@ -304,9 +235,9 @@ class PocketpairService:
 
                     seen_urls.add(url)
 
-                    # -----------------------------------------
+                    # =================================================
                     # TITRE
-                    # -----------------------------------------
+                    # =================================================
 
                     raw_title = link.get_text(
                         " ",
@@ -316,6 +247,7 @@ class PocketpairService:
                     if not raw_title:
                         continue
 
+                    # Navigation
                     if raw_title.lower() in {
                         "game news",
                         "all",
@@ -324,9 +256,9 @@ class PocketpairService:
                     }:
                         continue
 
-                    # -----------------------------------------
+                    # =================================================
                     # DATE
-                    # -----------------------------------------
+                    # =================================================
 
                     date_match = re.search(
                         r"\b(20\d{2}\.\d{2}\.\d{2})\b",
@@ -336,14 +268,11 @@ class PocketpairService:
                     published = ""
 
                     if date_match:
+                        published = date_match.group(1)
 
-                        published = (
-                            date_match.group(1)
-                        )
-
-                    # -----------------------------------------
+                    # =================================================
                     # CATEGORIE
-                    # -----------------------------------------
+                    # =================================================
 
                     category = "Palworld"
 
@@ -375,9 +304,9 @@ class PocketpairService:
 
                         category = "News"
 
-                    # -----------------------------------------
+                    # =================================================
                     # NETTOYAGE TITRE
-                    # -----------------------------------------
+                    # =================================================
 
                     title = raw_title
 
@@ -420,16 +349,13 @@ class PocketpairService:
                     if not title:
                         continue
 
-                    # -----------------------------------------
-                    # IGNORER PITCH YOUR GAME
-                    # -----------------------------------------
-
+                    # Pitch Your Game ignoré
                     if category == "Pitch Your Game":
                         continue
 
-                    # -----------------------------------------
+                    # =================================================
                     # GUID
-                    # -----------------------------------------
+                    # =================================================
 
                     guid = (
                         f"pocketpair:{url}"
@@ -440,28 +366,27 @@ class PocketpairService:
                     ):
                         continue
 
-                    # =========================================
-                    # ARTICLE
-                    # =========================================
+                    # =================================================
+                    # DETAILS ARTICLE
+                    # =================================================
 
-                    print(
-                        f"🔎 Lecture article Pocketpair : "
-                        f"{title}"
-                    )
-
-                    summary, image = (
-                        await self.extract_article_details(
+                    summary, image_url = (
+                        await self.fetch_article_details(
                             session,
-                            url,
-                            title
+                            url
                         )
                     )
+
+                    # =================================================
+                    # RESULTAT
+                    # =================================================
+
                     results.append(
                         {
                             "guid": guid,
                             "title": title,
                             "summary": summary,
-                            "image": image,
+                            "image": image_url,
                             "url": url,
                             "published": published,
                             "source": "Pocketpair",
@@ -469,14 +394,10 @@ class PocketpairService:
                         }
                     )
 
-                    # Petite pause pour éviter de spammer
-                    await asyncio.sleep(0.3)
-
         except Exception as error:
 
             print(
-                f"❌ Erreur Pocketpair : "
-                f"{error}"
+                f"❌ Erreur Pocketpair : {error}"
             )
 
         return results

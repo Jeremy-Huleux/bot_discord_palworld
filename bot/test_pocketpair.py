@@ -6,9 +6,6 @@ from services.pocketpair import PocketpairService
 class TestDatabase:
 
     def news_exists(self, guid):
-
-        # Pour le test, aucun article n'est considéré
-        # comme déjà enregistré.
         return False
 
 
@@ -33,6 +30,8 @@ async def main():
         print(f"📂 Catégorie : {article['category']}")
         print(f"📅 Date      : {article['published']}")
         print(f"📰 Titre     : {article['title']}")
+        print(f"📝 Résumé    : {article['summary'][:200]}")
+        print(f"🖼️ Image     : {article['image']}")
         print(f"🔗 URL       : {article['url']}")
 
     print()

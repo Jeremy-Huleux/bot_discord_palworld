@@ -1,0 +1,370 @@
+import re
+import aiohttp
+
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+
+
+POCKETPAIR_URL = (
+    "https://www.pocketpair.jp/en/"
+    "game-news/category_game/palworld-en/"
+)
+
+
+class PocketpairService:
+
+    def __init__(self, database):
+        self.database = database
+
+    async def extract_article_details(self, session, url):
+
+        try:
+
+            async with session.get(
+                url,
+                timeout=aiohttp.ClientTimeout(total=20)
+            ) as response:
+
+                if response.status != 200:
+                    print(
+                        f"⚠️ Pocketpair article HTTP "
+                        f"{response.status} : {url}"
+                    )
+                    return "", ""
+
+                html = await response.text()
+
+            soup = BeautifulSoup(
+                html,
+                "html.parser"
+            )
+
+            # ---------------------------------------------
+            # IMAGE
+            # ---------------------------------------------
+
+            image_url = ""
+
+            og_image = soup.find(
+                "meta",
+                property="og:image"
+            )
+
+            if og_image:
+                image_url = og_image.get(
+                    "content",
+                    ""
+                )
+
+            # Fallback : première image
+            if not image_url:
+
+                img = soup.find("img")
+
+                if img:
+                    image_url = img.get(
+                        "src",
+                        ""
+                    )
+
+            if image_url:
+
+                image_url = urljoin(
+                    url,
+                    image_url
+                )
+
+            # ---------------------------------------------
+            # CONTENU
+            # ---------------------------------------------
+
+            content = ""
+
+            selectors = [
+                "article",
+                ".entry-content",
+                ".post-content",
+                ".article-content",
+                "main"
+            ]
+
+            for selector in selectors:
+
+                element = soup.select_one(
+                    selector
+                )
+
+                if element:
+
+                    content = element.get_text(
+                        " ",
+                        strip=True
+                    )
+
+                    if len(content) > 100:
+                        break
+
+            # Nettoyage
+            content = re.sub(
+                r"\s+",
+                " ",
+                content
+            ).strip()
+
+            # Éviter les textes énormes
+            if len(content) > 500:
+                content = content[:500].rsplit(
+                    " ",
+                    1
+                )[0] + "..."
+
+            return content, image_url
+
+        except Exception as error:
+
+            print(
+                f"⚠️ Erreur lecture article Pocketpair : "
+                f"{error}"
+            )
+
+            return "", ""
+
+    async def fetch_news(self):
+
+        results = []
+
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 "
+                "(compatible; ZaelosPalworldBot/1.0)"
+            )
+        }
+
+        try:
+
+            async with aiohttp.ClientSession(
+                headers=headers
+            ) as session:
+
+                async with session.get(
+                    POCKETPAIR_URL,
+                    timeout=aiohttp.ClientTimeout(
+                        total=20
+                    )
+                ) as response:
+
+                    if response.status != 200:
+
+                        print(
+                            f"❌ Pocketpair HTTP "
+                            f"{response.status}"
+                        )
+
+                        return results
+
+                    html = await response.text()
+
+            soup = BeautifulSoup(
+                html,
+                "html.parser"
+            )
+
+            seen_urls = set()
+
+            for link in soup.find_all(
+                "a",
+                href=True
+            ):
+
+                href = link.get(
+                    "href",
+                    ""
+                )
+
+                url = urljoin(
+                    POCKETPAIR_URL,
+                    href
+                )
+
+                # -----------------------------------------
+                # URL ARTICLE
+                # -----------------------------------------
+
+                if "/game-news/" not in url:
+                    continue
+
+                if url.rstrip("/") == (
+                    "https://www.pocketpair.jp/en/game-news"
+                ):
+                    continue
+
+                if "category_game" in url:
+                    continue
+
+                if url in seen_urls:
+                    continue
+
+                seen_urls.add(url)
+
+                # -----------------------------------------
+                # TITRE
+                # -----------------------------------------
+
+                raw_title = link.get_text(
+                    " ",
+                    strip=True
+                )
+
+                if not raw_title:
+                    continue
+
+                if raw_title.lower() in {
+                    "game news",
+                    "all",
+                    "palworld",
+                    "palworld: palfarm"
+                }:
+                    continue
+
+                # -----------------------------------------
+                # DATE
+                # -----------------------------------------
+
+                date_match = re.search(
+                    r"\b(20\d{2}\.\d{2}\.\d{2})\b",
+                    raw_title
+                )
+
+                published = ""
+
+                if date_match:
+                    published = date_match.group(1)
+
+                # -----------------------------------------
+                # CATEGORIE
+                # -----------------------------------------
+
+                category = "Palworld"
+
+                lowered = raw_title.lower()
+
+                if "important notice" in lowered:
+
+                    category = "important notice"
+
+                elif "event information" in lowered:
+
+                    category = "Event Information"
+
+                elif "pitch your game" in lowered:
+
+                    category = "Pitch Your Game"
+
+                elif re.search(
+                    r"\bupdate\b",
+                    lowered
+                ):
+
+                    category = "update"
+
+                elif re.search(
+                    r"\bnews\b",
+                    lowered
+                ):
+
+                    category = "News"
+
+                # -----------------------------------------
+                # NETTOYAGE TITRE
+                # -----------------------------------------
+
+                title = raw_title
+
+                prefixes = [
+                    "important notice",
+                    "event information",
+                    "pitch your game",
+                    "update",
+                    "news",
+                    "palworld"
+                ]
+
+                for prefix in prefixes:
+
+                    title = re.sub(
+                        rf"^\s*{re.escape(prefix)}\s*",
+                        "",
+                        title,
+                        flags=re.IGNORECASE
+                    )
+
+                if published:
+
+                    title = title.replace(
+                        published,
+                        "",
+                        1
+                    )
+
+                title = re.sub(
+                    r"\s+",
+                    " ",
+                    title
+                ).strip()
+
+                title = title.strip(
+                    ":-–—| "
+                )
+
+                if not title:
+                    continue
+
+                # Pitch Your Game ignoré
+                if category == "Pitch Your Game":
+                    continue
+
+                # -----------------------------------------
+                # GUID
+                # -----------------------------------------
+
+                guid = (
+                    f"pocketpair:{url}"
+                )
+
+                if self.database.news_exists(
+                    guid
+                ):
+                    continue
+
+                # -----------------------------------------
+                # CONTENU ARTICLE
+                # -----------------------------------------
+
+                summary, image = (
+                    await self.extract_article_details(
+                        session,
+                        url
+                    )
+                )
+
+                results.append(
+                    {
+                        "guid": guid,
+                        "title": title,
+                        "summary": summary,
+                        "image": image,
+                        "url": url,
+                        "published": published,
+                        "source": "Pocketpair",
+                        "category": category
+                    }
+                )
+
+        except Exception as error:
+
+            print(
+                f"❌ Erreur Pocketpair : "
+                f"{error}"
+            )
+
+        return results
