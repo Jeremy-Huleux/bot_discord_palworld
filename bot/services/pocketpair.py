@@ -2,9 +2,13 @@ import re
 import logging
 import asyncio
 import aiohttp
-
+from typing import List
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+
+from config import Config
+from models import NewsArticle
+from services.database import Database
 
 logger = logging.getLogger("palworld_bot.pocketpair")
 
@@ -16,9 +20,40 @@ POCKETPAIR_URL = (
 
 
 class PocketpairService:
+    """
+    Scrapes news from Pocketpair official website.
+    Returns NewsArticle dataclasses for consistent handling.
+    Uses dependency injection for database.
+    """
 
-    def __init__(self, database):
+    def __init__(self, database: Database):
+        """
+        Initialize Pocketpair service
+        
+        Args:
+            database: Database instance for news checking
+        """
         self.database = database
+
+    def _map_category(self, pocketpair_category: str) -> str:
+        """
+        Map Pocketpair category names to standard categories
+        
+        Args:
+            pocketpair_category: Raw category from Pocketpair
+            
+        Returns:
+            Standard category: 'patch_notes', 'events', or 'news'
+        """
+        category_lower = pocketpair_category.lower()
+
+        if category_lower in {"update", "important notice"}:
+            return "patch_notes"
+
+        if category_lower in {"event information", "pitch your game"}:
+            return "events"
+
+        return "news"
 
     async def extract_article_details(
         self,
@@ -323,9 +358,15 @@ class PocketpairService:
 
             return "", ""
 
-    async def fetch_news(self):
+    async def fetch_news(self) -> List[NewsArticle]:
+        """
+        Fetch news from Pocketpair official website
+        
+        Returns:
+            List of NewsArticle dataclasses
+        """
 
-        results = []
+        results: List[NewsArticle] = []
 
         headers = {
             "User-Agent": (
@@ -567,18 +608,21 @@ class PocketpairService:
                         )
                     )
 
-                    results.append(
-                        {
-                            "guid": guid,
-                            "title": title,
-                            "summary": summary,
-                            "image": image,
-                            "url": url,
-                            "published": published,
-                            "source": "Pocketpair",
-                            "category": category
-                        }
+                    # Map Pocketpair category to standard categories
+                    standard_category = self._map_category(category)
+
+                    article = NewsArticle(
+                        guid=guid,
+                        title=title,
+                        summary=summary,
+                        image=image,
+                        url=url,
+                        published=published,
+                        source="Pocketpair",
+                        category=standard_category,
                     )
+
+                    results.append(article)
 
                     # Petite pause pour éviter de spammer
                     await asyncio.sleep(0.3)

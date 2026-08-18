@@ -1,21 +1,28 @@
 import sqlite3
 from pathlib import Path
-
-
-DATABASE_PATH = Path("/app/data/news.db")
+from typing import List
+from config import Config
+from models import NewsArticle
 
 
 class Database:
 
-    def __init__(self):
+    def __init__(self, db_path: Path = None):
+        """
+        Initialize database connection
+        
+        Args:
+            db_path: Path to database file (uses Config.DATABASE_PATH if None)
+        """
+        self.db_path = db_path or Config.DATABASE_PATH
 
-        DATABASE_PATH.parent.mkdir(
+        self.db_path.parent.mkdir(
             parents=True,
             exist_ok=True
         )
 
         self.connection = sqlite3.connect(
-            DATABASE_PATH,
+            str(self.db_path),
             check_same_thread=False
         )
 
@@ -34,6 +41,9 @@ class Database:
                 url TEXT NOT NULL,
                 published TEXT,
                 source TEXT NOT NULL,
+                category TEXT DEFAULT 'news',
+                summary TEXT,
+                image TEXT,
                 sent_at TEXT
             )
         """)
@@ -51,6 +61,11 @@ class Database:
         Maintenant :
             sent_at NULL = connu mais pas encore envoyé
             sent_at rempli = envoyé
+            
+        Nouvelles colonnes :
+            category: Type de news (news, patch_notes, events)
+            summary: Résumé de l'article
+            image: Image associée à l'article
         """
 
         columns = self.connection.execute(
@@ -62,12 +77,32 @@ class Database:
             for column in columns
         }
 
+        # Ajouter sent_at si manquante
         if "sent_at" not in column_names:
-
             self.connection.execute(
                 "ALTER TABLE news ADD COLUMN sent_at TEXT"
             )
+            self.connection.commit()
 
+        # Ajouter category si manquante
+        if "category" not in column_names:
+            self.connection.execute(
+                "ALTER TABLE news ADD COLUMN category TEXT DEFAULT 'news'"
+            )
+            self.connection.commit()
+
+        # Ajouter summary si manquante
+        if "summary" not in column_names:
+            self.connection.execute(
+                "ALTER TABLE news ADD COLUMN summary TEXT"
+            )
+            self.connection.commit()
+
+        # Ajouter image si manquante
+        if "image" not in column_names:
+            self.connection.execute(
+                "ALTER TABLE news ADD COLUMN image TEXT"
+            )
             self.connection.commit()
 
     # ---------------------------------------------------------
@@ -119,9 +154,24 @@ class Database:
         title: str,
         url: str,
         published: str,
-        source: str
+        source: str,
+        category: str = "news",
+        summary: str = None,
+        image: str = None
     ):
-
+        """
+        Save a pending news article
+        
+        Args:
+            guid: Unique article identifier
+            title: Article title
+            url: Article URL
+            published: Publication date
+            source: News source (Steam, Pocketpair, etc.)
+            category: news, patch_notes, or events
+            summary: Article summary/preview text
+            image: Image URL
+        """
         self.connection.execute(
             """
             INSERT OR IGNORE INTO news
@@ -131,16 +181,22 @@ class Database:
                 url,
                 published,
                 source,
+                category,
+                summary,
+                image,
                 sent_at
             )
-            VALUES (?, ?, ?, ?, ?, NULL)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
             """,
             (
                 guid,
                 title,
                 url,
                 published,
-                source
+                source,
+                category,
+                summary,
+                image
             )
         )
 
@@ -167,8 +223,13 @@ class Database:
     # Récupère les news non envoyées
     # ---------------------------------------------------------
 
-    def get_unsent_news(self):
-
+    def get_unsent_news(self) -> List[NewsArticle]:
+        """
+        Get all unsent news articles
+        
+        Returns:
+            List of NewsArticle dataclasses
+        """
         cursor = self.connection.execute(
             """
             SELECT *
@@ -178,4 +239,34 @@ class Database:
             """
         )
 
-        return cursor.fetchall()
+        news_list = []
+        for row in cursor.fetchall():
+            news_list.append(self._row_to_article(row))
+
+        return news_list
+
+    # ---------------------------------------------------------
+    # Helpers
+    # ---------------------------------------------------------
+
+    def _row_to_article(self, row) -> NewsArticle:
+        """
+        Convert database row to NewsArticle dataclass
+        
+        Args:
+            row: sqlite3.Row object
+            
+        Returns:
+            NewsArticle dataclass
+        """
+        return NewsArticle(
+            guid=row["guid"],
+            title=row["title"],
+            url=row["url"],
+            published=row.get("published"),
+            source=row["source"],
+            category=row.get("category", "news"),
+            summary=row.get("summary", ""),
+            image=row.get("image"),
+            sent_at=row.get("sent_at"),
+        )

@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+from config import Config
 from services.database import Database
 from services.news_service import NewsService
 from logger import logger
@@ -11,24 +12,18 @@ from logger import logger
 
 load_dotenv()
 
-
-TOKEN = os.getenv("DISCORD_TOKEN")
-GUILD_ID = os.getenv("DISCORD_GUILD_ID")
-
-
-if not TOKEN:
-    logger.error("DISCORD_TOKEN n'est pas défini.")
-    raise RuntimeError("DISCORD_TOKEN n'est pas défini.")
-
-if not GUILD_ID:
-    logger.error("DISCORD_GUILD_ID n'est pas défini.")
-    raise RuntimeError("DISCORD_GUILD_ID n'est pas défini.")
-
-
-GUILD_ID = int(GUILD_ID)
+# Validate configuration
+if not Config.validate():
+    logger.error("Configuration validation failed")
+    raise RuntimeError("Invalid configuration")
 
 
 class PalworldBot(commands.Bot):
+    """
+    Main Discord bot class for Palworld
+    Initializes services, loads cogs, and syncs commands
+    Uses dependency injection for better testability
+    """
 
     def __init__(self):
 
@@ -39,34 +34,12 @@ class PalworldBot(commands.Bot):
             intents=intents
         )
 
+        # Initialize services with dependency injection
         self.database = Database()
 
         self.news_service = NewsService(
             self.database
         )
-
-        # ==========================================
-        # CONFIGURATION DISCORD
-        # ==========================================
-
-        self.channels_config = {
-
-            "patch_notes": os.getenv(
-                "PATCH_NOTES_CHANNEL_ID"
-            ),
-
-            "news": os.getenv(
-                "NEWS_CHANNEL_ID"
-            ),
-
-            "events": os.getenv(
-                "EVENTS_CHANNEL_ID"
-            ),
-
-            "palworld_role": os.getenv(
-                "PALWORLD_ROLE_ID"
-            )
-        }
 
 
     async def setup_hook(self):
@@ -80,7 +53,7 @@ class PalworldBot(commands.Bot):
             logger.error(f"❌ Erreur chargement cog 'news': {error}")
 
         guild = discord.Object(
-            id=GUILD_ID
+            id=Config.DISCORD_GUILD_ID
         )
 
         self.tree.copy_global_to(
@@ -101,8 +74,11 @@ class PalworldBot(commands.Bot):
         logger.info("=" * 60)
         logger.info("🤖 PALWORLD BOT DÉMARRÉ AVEC SUCCÈS")
         logger.info(f"Connecté en tant que : {self.user}")
-        logger.info(f"Serveur Discord ID : {GUILD_ID}")
+        logger.info(f"Serveur Discord ID : {Config.DISCORD_GUILD_ID}")
         logger.info("=" * 60)
+
+        # Print configuration summary
+        logger.info(Config.summary())
 
 
 bot = PalworldBot()
@@ -121,4 +97,4 @@ async def ping(
     )
 
 
-bot.run(TOKEN)
+bot.run(Config.DISCORD_TOKEN)

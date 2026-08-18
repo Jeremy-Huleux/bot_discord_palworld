@@ -3,12 +3,19 @@ import logging
 
 import discord
 from discord.ext import commands, tasks
-from datetime import datetime
+
+from config import Config
+from models import NewsArticle
+from utils import EmbedBuilder, ViewBuilder, Formatter
 
 logger = logging.getLogger("palworld_bot.news")
 
 
 class NewsCog(commands.Cog):
+    """
+    Discord cog for news management
+    Handles fetching, checking, and sending Palworld news to Discord channels
+    """
 
     def __init__(self, bot):
 
@@ -20,62 +27,13 @@ class NewsCog(commands.Cog):
         self.news_check.cancel()
 
     # =========================================================
-    # OUTILS
+    # UTILITIES
     # =========================================================
 
-    def format_date(self, published):
-
-        if not published:
-            return "Non disponible"
-
-        # Pocketpair : YYYY.MM.DD
-        try:
-
-            if re.match(
-                r"^\d{4}\.\d{2}\.\d{2}$",
-                published
-            ):
-
-                date = datetime.strptime(
-                    published,
-                    "%Y.%m.%d"
-                )
-
-                return date.strftime(
-                    "%d/%m/%Y"
-                )
-
-        except Exception:
-            pass
-
-        return published
-
-    def get_category_design(self, category):
-
-        if category == "patch_notes":
-
-            return {
-                "color": discord.Color.green(),
-                "emoji": "🔧",
-                "label": "MISE À JOUR & CORRECTIF"
-            }
-
-        if category == "events":
-
-            return {
-                "color": discord.Color.gold(),
-                "emoji": "🎁",
-                "label": "ÉVÉNEMENT SPÉCIAL"
-            }
-
-        return {
-            "color": discord.Color.blue(),
-            "emoji": "📰",
-            "label": "ACTUALITÉ PALWORLD"
-        }
-
-    def is_major_update(self, title):
-
+    def is_major_update(self, title: str) -> bool:
+        """
+        Check if an article title indicates a major update
+        """
         title_lower = title.lower()
 
         major_keywords = [
@@ -97,151 +55,7 @@ class NewsCog(commands.Cog):
         )
 
     # =========================================================
-    # CONSTRUCTION DE L'EMBED
-    # =========================================================
-
-    def build_news_embed(self, news):
-
-        category = news.get(
-            "category",
-            "news"
-        )
-
-        design = self.get_category_design(
-            category
-        )
-
-        emoji = design["emoji"]
-        label = design["label"]
-        color = design["color"]
-
-        title = news.get(
-            "title",
-            "Actualité Palworld"
-        )
-
-        summary = news.get(
-            "summary",
-            ""
-        )
-
-        source = news.get(
-            "source",
-            "Inconnue"
-        )
-
-        published = news.get(
-            "published",
-            ""
-        )
-
-        url = news.get(
-            "url",
-            ""
-        )
-
-        image = news.get(
-            "image",
-            ""
-        )
-
-        # -----------------------------------------------------
-        # DESCRIPTION
-        # -----------------------------------------------------
-
-        if summary:
-
-            description = (
-                f"**{label}**\n\n"
-                f"{summary}"
-            )
-
-        else:
-
-            description = (
-                f"**{label}**\n\n"
-                "Une nouvelle publication "
-                "Palworld est disponible."
-            )
-
-        # -----------------------------------------------------
-        # EMBED
-        # -----------------------------------------------------
-
-        embed = discord.Embed(
-            title=f"{emoji} {title}",
-            description=description,
-            url=url if url else discord.Embed.Empty,
-            color=color
-        )
-
-        # -----------------------------------------------------
-        # IMAGE
-        # -----------------------------------------------------
-
-        if image:
-
-            embed.set_image(
-                url=image
-            )
-
-        # -----------------------------------------------------
-        # INFORMATIONS
-        # -----------------------------------------------------
-
-        embed.add_field(
-            name="📅 Date",
-            value=self.format_date(
-                published
-            ),
-            inline=True
-        )
-
-        embed.add_field(
-            name="📰 Source",
-            value=source,
-            inline=True
-        )
-
-        # -----------------------------------------------------
-        # FOOTER
-        # -----------------------------------------------------
-
-        embed.set_footer(
-            text="Zaelos Palworld Bot"
-        )
-
-        return embed
-
-    # =========================================================
-    # BOUTON ARTICLE
-    # =========================================================
-
-    def build_news_view(self, news):
-
-        url = news.get(
-            "url",
-            ""
-        )
-
-        view = discord.ui.View(
-            timeout=None
-        )
-
-        if url:
-
-            view.add_item(
-                discord.ui.Button(
-                    label="Lire l'article",
-                    url=url,
-                    emoji="🔗"
-                )
-            )
-
-        return view
-
-    # =========================================================
-    # VERIFICATION AUTOMATIQUE
+    # AUTOMATIC VERIFICATION
     # =========================================================
 
     @tasks.loop(minutes=5)
@@ -278,122 +92,51 @@ class NewsCog(commands.Cog):
             )
 
     # =========================================================
-    # ENVOI DISCORD
+    # DISCORD SEND
     # =========================================================
 
-    async def send_news(self, news):
+    async def send_news(self, article: NewsArticle) -> bool:
+        """
+        Send a news article to Discord
+        
+        Args:
+            article: NewsArticle dataclass
+            
+        Returns:
+            True if sent successfully, False otherwise
+        """
+        channels_config = Config.get_channels_config()
 
-        category = news.get(
-            "category",
-            "news"
+        channel_id = (
+            channels_config.get(article.category)
+            or channels_config.get("news")
         )
 
-        channel_id_str = (
-            self.bot.channels_config.get(
-                category
-            )
-        )
-
-        if not channel_id_str:
-
-            channel_id_str = (
-                self.bot.channels_config.get(
-                    "news"
-                )
-            )
-
-        if not channel_id_str:
-
-            print(
-                "⚠️ Aucun salon Discord configuré."
-            )
-
+        if not channel_id:
+            logger.warning("No Discord channel configured for news")
             return False
 
-        try:
-
-            channel_id = int(
-                channel_id_str
-            )
-
-        except ValueError:
-
-            print(
-                f"❌ ID de salon invalide : "
-                f"{channel_id_str}"
-            )
-
-            return False
-
-        channel = self.bot.get_channel(
-            channel_id
-        )
+        channel = self.bot.get_channel(channel_id)
 
         if not channel:
-
-            print(
-                f"⚠️ Salon Discord "
-                f"{channel_id_str} introuvable."
-            )
-
+            logger.warning(f"Discord channel {channel_id} not found")
             return False
 
-        # -----------------------------------------------------
-        # EMBED
-        # -----------------------------------------------------
+        # Build embed and view using builders
+        embed = EmbedBuilder.news_embed(article)
+        view = ViewBuilder.news_view(article)
 
-        embed = self.build_news_embed(
-            news
-        )
-
-        # -----------------------------------------------------
-        # BOUTON
-        # -----------------------------------------------------
-
-        view = self.build_news_view(
-            news
-        )
-
-        # -----------------------------------------------------
-        # MENTION GROSSE MISE À JOUR
-        # -----------------------------------------------------
-
+        # Handle major update mentions
         content = None
 
-        title = news.get(
-            "title",
-            ""
-        )
+        if self.is_major_update(article.title):
+            palworld_role_id = channels_config.get("palworld_role")
 
-        if self.is_major_update(
-            title
-        ):
+            if palworld_role_id:
+                content = f"<@&{palworld_role_id}>"
 
-            role_id = (
-                self.bot.channels_config.get(
-                    "palworld_role"
-                )
-            )
-
-            if role_id:
-
-                content = (
-                    f"<@&{role_id}>"
-                )
-
-            else:
-
-                print(
-                    "📣 Grosse mise à jour détectée "
-                    "(aucun rôle @Palworld configuré)."
-                )
-
-        # -----------------------------------------------------
-        # ENVOI
-        # -----------------------------------------------------
-
+        # Send to Discord
         try:
-
             await channel.send(
                 content=content,
                 embed=embed,
@@ -401,25 +144,13 @@ class NewsCog(commands.Cog):
             )
 
         except Exception as error:
-
-            logger.error(
-                f"Erreur envoi Discord: {error}"
-            )
-
+            logger.error(f"Discord send error: {error}")
             return False
 
-        # -----------------------------------------------------
-        # ENREGISTREMENT
-        # -----------------------------------------------------
+        # Mark as sent in database
+        self.bot.news_service.mark_as_sent(article.guid)
 
-        self.bot.news_service.mark_as_sent(
-            news
-        )
-
-        print(
-            f"🆕 Actualité envoyée : "
-            f"{title}"
-        )
+        logger.info(f"News sent: {article.title}")
 
         return True
 
