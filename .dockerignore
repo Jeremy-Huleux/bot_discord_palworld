@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+venv/
+env/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Project
+.env
+data/
+*.db
+*.log
+
+# Backups
+*.bak
+*.backup
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db

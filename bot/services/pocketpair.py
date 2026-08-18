@@ -357,9 +357,9 @@ class PocketpairService:
 
                     if response.status != 200:
 
-                        print(
                         logger.error(
-                            f"Pocketpair HTTP 
+                            f"Pocketpair HTTP {response.status}"
+                        )
 
                         return results
 
@@ -552,9 +552,9 @@ class PocketpairService:
                     # =========================================
 
 
-                    print(
                     logger.debug(
-                        f"Lecture article Pocketpair: 
+                        f"Lecture article Pocketpair: {title}"
+                    )
 
                     summary, image = (
                         await self.extract_article_details(
@@ -585,8 +585,8 @@ class PocketpairService:
 
         except Exception as error:
 
-            print(
             logger.error(
-                f"Erreur Pocketpair: 
+                f"Erreur Pocketpair: {error}"
+            )
 
         return results

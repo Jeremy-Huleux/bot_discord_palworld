@@ -70,18 +70,59 @@ nano .env
 python bot/main.py
 ```
 
-### Avec Docker
+### Avec Docker (Recommandé) ⭐
 
+**Avec Makefile (plus simple):**
+```bash
+make install-env    # Créer .env à partir de .env.example
+# Éditer .env avec vos valeurs
+nano .env
+
+make build          # Builder l'image
+make up             # Démarrer le bot
+make logs           # Voir les logs
+```
+
+**Ou commandes Docker directes:**
 ```bash
 # 1. Configurer .env
 cp .env.example .env
-nano .env
+nano .env  # Éditer avec vos valeurs
 
-# 2. Lancer avec docker-compose
+# 2. Builder l'image Docker
+docker-compose build
+
+# 3. Démarrer le bot en arrière-plan
 docker-compose up -d
 
-# 3. Vérifier les logs
+# 4. Vérifier les logs en direct
 docker-compose logs -f palworld-bot
+
+# 5. Arrêter le bot
+docker-compose down
+
+# 6. Redémarrer
+docker-compose restart
+```
+
+### Tests dans Docker
+
+```bash
+# Voir les logs du bot
+make logs
+# ou: docker-compose logs -f palworld-bot
+
+# Exécuter les tests Pocketpair DANS Docker
+make test
+# ou: docker-compose exec palworld-bot python bot/test_pocketpair.py
+
+# Entrer dans le container (shell)
+make shell
+# ou: docker-compose exec palworld-bot bash
+
+# Vérifier les versions
+make version
+# ou: docker-compose exec palworld-bot pip list | grep discord
 ```
 
 ---
@@ -120,7 +161,32 @@ Voir [.env.example](.env.example) pour la liste complète.
 
 ## 🎯 Lancement
 
-### Mode local
+### Mode Docker (RECOMMANDÉ) ⭐
+
+```bash
+docker-compose build
+docker-compose up -d
+docker-compose logs -f palworld-bot
+```
+
+Attendez le message:
+```
+[2026-08-18 15:30:45] INFO     | palworld_bot | ============================================================
+[2026-08-18 15:30:45] INFO     | palworld_bot | 🤖 PALWORLD BOT DÉMARRÉ AVEC SUCCÈS
+[2026-08-18 15:30:45] INFO     | palworld_bot | Connecté en tant que : PalworldBot#1234
+[2026-08-18 15:30:45] INFO     | palworld_bot | Serveur Discord ID : 123456789
+[2026-08-18 15:30:45] INFO     | palworld_bot | ============================================================
+```
+
+**Avantages Docker:**
+- ✅ Environnement reproductible (Python 3.12 garanti)
+- ✅ Isolation du système
+- ✅ Compatible production (AWS, VPS, Heroku, etc)
+- ✅ Logs centralisés
+- ✅ Redémarrage automatique
+- ✅ Volume persistant pour `/app/data`
+
+### Mode local (Développement)
 
 ```bash
 source venv/bin/activate
@@ -129,26 +195,8 @@ python bot/main.py
 
 Attendez le message:
 ```
-==================================================
-🤖 Palworld Bot démarré
-Connecté en tant que : PalworldBot#1234
-Serveur Discord ID : 123456789
-==================================================
-```
-
-### Mode Docker
-
-```bash
-docker-compose up -d
-
-# Vérifier le statut
-docker-compose ps
-
-# Voir les logs
-docker-compose logs -f palworld-bot
-
-# Arrêter
-docker-compose down
+[2026-08-18 15:30:45] INFO     | palworld_bot | ============================================================
+[2026-08-18 15:30:45] INFO     | palworld_bot | 🤖 PALWORLD BOT DÉMARRÉ AVEC SUCCÈS
 ```
 
 ---
@@ -255,45 +303,181 @@ Voir l'audit complet pour détails.
 
 ## 🛠️ Troubleshooting
 
-### Le bot ne démarre pas
+### Erreurs Docker
 
+#### Build échoue
 ```
-RuntimeError: DISCORD_TOKEN n'est pas défini
-```
-
-**Solution**: Vérifier que `.env` existe et contient `DISCORD_TOKEN`
-
-### Les actualités ne s'envoient pas
-
-```
-⚠️ Aucun salon Discord configuré
+ERROR: Service 'palworld-bot' failed to build
 ```
 
-**Solution**: Vérifier que `NEWS_CHANNEL_ID` est défini dans `.env`
-
-### Web scraping Pocketpair échoue
-
-```
-❌ Erreur lecture article Pocketpair
+**Solution**: 
+```bash
+docker-compose build --no-cache
 ```
 
-**Solution**: Le site Pocketpair peut avoir changé son HTML. Vérifier les sélecteurs CSS dans `services/pocketpair.py`
-
-### Google Translate échoue
-
+#### Le container ne démarre pas
 ```
-⚠️ Erreur traduction
+docker-compose up -d
+# Puis: docker-compose logs palworld-bot
 ```
 
-**Solution**: Google Translate peut être surchargé. Vérifier la connexion internet.
+Vérifier les erreurs dans les logs. Causes courantes:
+- `.env` manquant ou mal configuré
+- Port 8211 (Palworld API) déjà utilisé
+- Permissions `/data/` problématiques
 
-### Erreur base de données
+**Solution**:
+```bash
+# Vérifier que .env existe
+ls -la .env
+
+# Reconstruire
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+
+# Voir les logs
+docker-compose logs -f palworld-bot
+```
+
+#### Permission denied on /app/data
+```
+PermissionError: [Errno 13] Permission denied: '/app/data/news.db'
+```
+
+**Solution**:
+```bash
+# Le volume ./data/ doit être accessible en écriture
+sudo chown -R $USER:$USER ./data/
+chmod -R 755 ./data/
+
+# Puis redémarrer
+docker-compose restart
+```
+
+#### Port déjà utilisé
+```
+ERROR: for palworld-bot Cannot start service palworld-bot: driver failed programming external connectivity
+```
+
+**Solution**:
+```bash
+# Arrêter les autres containers
+docker-compose down
+
+# Ou utiliser un port différent (voir docker-compose.yml)
+```
+
+### Erreurs d'exécution
+
+#### Le bot ne démarre pas
 
 ```
-sqlite3.OperationalError: disk I/O error
+[ERROR] RuntimeError: DISCORD_TOKEN n'est pas défini.
 ```
 
-**Solution**: Vérifier que `/app/data/` est accessible en écriture (Docker) ou que `./data/` existe (local)
+**Solution**: 
+```bash
+# Vérifier .env
+cat .env | grep DISCORD_TOKEN
+
+# Reconfigurer
+cp .env.example .env
+nano .env
+docker-compose restart
+```
+
+#### Les actualités ne s'envoient pas
+
+```
+[WARNING] Aucun salon Discord configuré
+```
+
+**Solution**: Vérifier que `NEWS_CHANNEL_ID` est défini dans `.env` avec un ID numérique valide:
+```bash
+docker-compose exec palworld-bot python -c "import os; print(os.getenv('NEWS_CHANNEL_ID'))"
+```
+
+#### Web scraping Pocketpair échoue
+
+```
+[ERROR] Erreur lecture article Pocketpair: ...
+```
+
+**Cause**: Le site Pocketpair peut avoir changé son HTML/structure
+
+**Solution**: 
+```bash
+# Tester directement dans Docker
+docker-compose exec palworld-bot python bot/test_pocketpair.py
+
+# Vérifier les sélecteurs CSS dans services/pocketpair.py
+```
+
+#### Google Translate échoue
+
+```
+[WARNING] Erreur traduction Steam: ...
+```
+
+**Cause**: Google Translate peut être surchargé ou inaccessible
+
+**Solution**:
+```bash
+# Vérifier la connectivité internet du container
+docker-compose exec palworld-bot curl https://translate.google.com
+
+# Vérifier les logs détaillés
+docker-compose logs -f palworld-bot | grep -i traduc
+```
+
+#### Erreur base de données
+
+```
+[ERROR] sqlite3.OperationalError: disk I/O error
+```
+
+**Solution**:
+```bash
+# Vérifier que le volume est accessible
+docker-compose exec palworld-bot ls -la /app/data/
+
+# Vérifier les permissions
+docker-compose exec palworld-bot touch /app/data/test.txt && rm /app/data/test.txt
+
+# Recréer la DB si besoin
+docker-compose exec palworld-bot rm /app/data/news.db
+docker-compose restart
+```
+
+### Debug
+
+#### Voir les logs en temps réel
+```bash
+docker-compose logs -f palworld-bot
+```
+
+#### Déboguer dans le container
+```bash
+# Entrer dans le container
+docker-compose exec palworld-bot bash
+
+# À l'intérieur du container
+python -c "from logger import logger; logger.info('Test')"
+python bot/test_pocketpair.py
+pip list
+```
+
+#### Vérifier les variables d'environnement
+```bash
+docker-compose exec palworld-bot env | grep -E 'DISCORD|PALWORLD'
+```
+
+#### Vérifier la connectivité réseau
+```bash
+docker-compose exec palworld-bot ping discord.com
+docker-compose exec palworld-bot curl -I https://www.pocketpair.jp/
+```
 
 ---
 

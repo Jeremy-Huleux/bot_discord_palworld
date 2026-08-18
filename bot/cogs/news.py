@@ -402,9 +402,9 @@ class NewsCog(commands.Cog):
 
         except Exception as error:
 
-            print(
             logger.error(
-                f"Erreur envoi Discord: 
+                f"Erreur envoi Discord: {error}"
+            )
 
             return False
 
