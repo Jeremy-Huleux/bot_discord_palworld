@@ -1,10 +1,12 @@
 import os
+import logging
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
 from services.database import Database
 from services.news_service import NewsService
+from logger import logger
 
 
 load_dotenv()
@@ -15,9 +17,11 @@ GUILD_ID = os.getenv("DISCORD_GUILD_ID")
 
 
 if not TOKEN:
+    logger.error("DISCORD_TOKEN n'est pas défini.")
     raise RuntimeError("DISCORD_TOKEN n'est pas défini.")
 
 if not GUILD_ID:
+    logger.error("DISCORD_GUILD_ID n'est pas défini.")
     raise RuntimeError("DISCORD_GUILD_ID n'est pas défini.")
 
 
@@ -67,9 +71,13 @@ class PalworldBot(commands.Bot):
 
     async def setup_hook(self):
 
-        await self.load_extension(
-            "cogs.news"
-        )
+        try:
+            await self.load_extension(
+                "cogs.news"
+            )
+            logger.info("✅ Cog 'news' chargé")
+        except Exception as error:
+            logger.error(f"❌ Erreur chargement cog 'news': {error}")
 
         guild = discord.Object(
             id=GUILD_ID
@@ -79,32 +87,22 @@ class PalworldBot(commands.Bot):
             guild=guild
         )
 
-        await self.tree.sync(
-            guild=guild
-        )
-
-        print(
-            "Commandes Discord synchronisées."
-        )
+        try:
+            await self.tree.sync(
+                guild=guild
+            )
+            logger.info("✅ Commandes Discord synchronisées")
+        except Exception as error:
+            logger.error(f"❌ Erreur synchronisation commandes: {error}")
 
 
     async def on_ready(self):
 
-        print("=" * 50)
-
-        print(
-            "🤖 Palworld Bot démarré"
-        )
-
-        print(
-            f"Connecté en tant que : {self.user}"
-        )
-
-        print(
-            f"Serveur Discord ID : {GUILD_ID}"
-        )
-
-        print("=" * 50)
+        logger.info("=" * 60)
+        logger.info("🤖 PALWORLD BOT DÉMARRÉ AVEC SUCCÈS")
+        logger.info(f"Connecté en tant que : {self.user}")
+        logger.info(f"Serveur Discord ID : {GUILD_ID}")
+        logger.info("=" * 60)
 
 
 bot = PalworldBot()

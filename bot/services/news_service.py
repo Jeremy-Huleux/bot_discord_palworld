@@ -1,9 +1,12 @@
+import logging
 import aiohttp
 import feedparser
 from bs4 import BeautifulSoup
 from deep_translator import GoogleTranslator
 
 from services.pocketpair import PocketpairService
+
+logger = logging.getLogger("palworld_bot.news_service")
 
 
 class NewsService:
@@ -178,9 +181,8 @@ class NewsService:
 
                         except Exception as error:
 
-                            print(
-                                f"⚠️ Erreur traduction Steam : "
-                                f"{error}"
+                            logger.warning(
+                                f"Erreur traduction Steam: {error}"
                             )
 
                             title_fr = raw_title
@@ -209,9 +211,8 @@ class NewsService:
 
                 except Exception as error:
 
-                    print(
-                        f"❌ Erreur récupération Steam : "
-                        f"{error}"
+                    logger.error(
+                        f"Erreur récupération Steam: {error}"
                     )
 
         return results
@@ -277,9 +278,8 @@ class NewsService:
 
                 except Exception as error:
 
-                    print(
-                        f"⚠️ Erreur traduction "
-                        f"Pocketpair : {error}"
+                    logger.warning(
+                        f"Erreur traduction Pocketpair: {error}"
                     )
 
                 # Pocketpair n'a pas encore
@@ -300,9 +300,8 @@ class NewsService:
 
         except Exception as error:
 
-            print(
-                f"❌ Erreur Pocketpair : "
-                f"{error}"
+            logger.error(
+                f"Erreur Pocketpair: {error}"
             )
 
         return results

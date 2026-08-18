@@ -1,8 +1,11 @@
 import re
+import logging
 
 import discord
 from discord.ext import commands, tasks
 from datetime import datetime
+
+logger = logging.getLogger("palworld_bot.news")
 
 
 class NewsCog(commands.Cog):
@@ -244,9 +247,7 @@ class NewsCog(commands.Cog):
     @tasks.loop(minutes=5)
     async def news_check(self):
 
-        print(
-            "📰 Vérification des actualités Palworld..."
-        )
+        logger.info("Vérification des actualités Palworld...")
 
         try:
 
@@ -256,15 +257,12 @@ class NewsCog(commands.Cog):
 
             if not news_list:
 
-                print(
-                    "Aucune nouvelle actualité."
-                )
+                logger.debug("Aucune nouvelle actualité détectée")
 
                 return
 
-            print(
-                f"🆕 {len(news_list)} nouvelle(s) "
-                f"actualité(s) détectée(s)."
+            logger.info(
+                f"Détection de {len(news_list)} nouvelle(s) actualité(s)"
             )
 
             for news in reversed(news_list):
@@ -275,9 +273,8 @@ class NewsCog(commands.Cog):
 
         except Exception as error:
 
-            print(
-                f"❌ Erreur système News : "
-                f"{error}"
+            logger.error(
+                f"Erreur système news: {error}"
             )
 
     # =========================================================
@@ -406,9 +403,8 @@ class NewsCog(commands.Cog):
         except Exception as error:
 
             print(
-                f"❌ Erreur envoi Discord : "
-                f"{error}"
-            )
+            logger.error(
+                f"Erreur envoi Discord: 
 
             return False
 

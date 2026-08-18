@@ -1,9 +1,12 @@
 import re
+import logging
 import asyncio
 import aiohttp
 
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+
+logger = logging.getLogger("palworld_bot.pocketpair")
 
 
 POCKETPAIR_URL = (
@@ -35,9 +38,8 @@ class PocketpairService:
 
                 if response.status != 200:
 
-                    print(
-                        f"⚠️ Pocketpair article HTTP "
-                        f"{response.status} : {url}"
+                    logger.warning(
+                        f"Pocketpair article HTTP {response.status}: {url}"
                     )
 
                     return "", ""
@@ -315,9 +317,8 @@ class PocketpairService:
 
         except Exception as error:
 
-            print(
-                f"⚠️ Erreur lecture article Pocketpair : "
-                f"{error}"
+            logger.error(
+                f"Erreur lecture article Pocketpair: {error}"
             )
 
             return "", ""
@@ -357,9 +358,8 @@ class PocketpairService:
                     if response.status != 200:
 
                         print(
-                            f"❌ Pocketpair HTTP "
-                            f"{response.status}"
-                        )
+                        logger.error(
+                            f"Pocketpair HTTP 
 
                         return results
 
@@ -553,9 +553,8 @@ class PocketpairService:
 
 
                     print(
-                        f"🔎 Lecture article Pocketpair : "
-                        f"{title}"
-                    )
+                    logger.debug(
+                        f"Lecture article Pocketpair: 
 
                     summary, image = (
                         await self.extract_article_details(
@@ -587,8 +586,7 @@ class PocketpairService:
         except Exception as error:
 
             print(
-                f"❌ Erreur Pocketpair : "
-                f"{error}"
-            )
+            logger.error(
+                f"Erreur Pocketpair: 
 
         return results
