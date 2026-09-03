@@ -89,5 +89,25 @@ Le projet .NET du convertisseur est dans `tools/uasset_exporter/`. Il ne doit
 jamais recevoir un PAK en écriture et ses sorties doivent rester dans un staging
 externe tel que `/tmp/palworld-data/`.
 
+## Normalisation et validation des Pals
+
+Le script `tools/normalize_pal_data.py` transforme la table brute exportée en un
+dataset `pals.json` sans compléter les champs absents. Chaque ligne conserve son
+identifiant interne, son build, son asset source et la provenance `GAME_DATA`.
+
+```bash
+python tools/normalize_pal_data.py \
+  --input-root /tmp/palworld-data/normalized/24575149 \
+  --output /tmp/palworld-data/normalized/24575149/pals.json \
+  --build 24575149
+
+python tools/validate_pal_data.py \
+  /tmp/palworld-data/normalized/24575149/pals.json
+```
+
+Sur le build `24575149`, la normalisation produit 735 Pals et la validation
+réussit. Les types sont ceux présents dans le dataset (`Normal`, `Fire`, `Water`,
+`Ice`, `Leaf`, `Earth`, `Electricity`, `Dark`, `Dragon`).
+
 Ne jamais copier le PAK, les assets extraits ou les donnees proprietaires dans le
 depot Git.
