@@ -209,6 +209,7 @@ Attendez le message:
 |----------|-------------|
 | `/ping` | Vérifier que le bot fonctionne |
 | `/pals <nom>` | Rechercher un Pal dans l'encyclopédie locale |
+| `/breeding <parent1> <parent2>` | Calculer les résultats possibles de breeding |
 | `/items <nom>` | Rechercher un objet dans le catalogue local |
 | `/boss <nom>` | Rechercher un boss dans le catalogue local |
 | `/server` | Statut, version, joueurs et uptime du serveur Palworld |

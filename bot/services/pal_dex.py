@@ -48,6 +48,7 @@ class PalDexService:
                 defense=70,
                 description="Un Pal docile qui produit de la laine.",
                 partner_skill="Bouclier laineux",
+                breeding_power=1000,
             ),
             Pal(
                 id=2,
@@ -60,6 +61,7 @@ class PalDexService:
                 defense=70,
                 description="Un petit Pal de feu capable d'etre porte.",
                 partner_skill="Embraseur",
+                breeding_power=950,
             ),
             Pal(
                 id=3,
@@ -72,5 +74,6 @@ class PalDexService:
                 defense=70,
                 description="Un Pal polyvalent qui aide a transporter les objets.",
                 partner_skill="Cat Assistance",
+                breeding_power=900,
             ),
         ]
