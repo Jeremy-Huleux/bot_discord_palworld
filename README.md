@@ -211,8 +211,8 @@ Attendez le message:
 | `/pals <nom>` | Rechercher un Pal (prochainement) |
 | `/items <nom>` | Rechercher un objet (prochainement) |
 | `/boss` | Liste des boss (prochainement) |
-| `/server` | Statut du serveur Palworld (prochainement) |
-| `/players` | Joueurs connectés (prochainement) |
+| `/server` | Statut, version, joueurs et uptime du serveur Palworld |
+| `/players` | Joueurs actuellement connectés |
 
 ### Admin
 
@@ -235,7 +235,8 @@ bot/
 ├── services/
 │   ├── database.py         # Base de données SQLite
 │   ├── news_service.py     # Agrégation news
-│   └── pocketpair.py       # Web scraping Pocketpair
+│   ├── pocketpair.py       # Web scraping Pocketpair
+│   └── server_monitor.py   # Monitoring A2S du serveur
 └── data/
     └── news.db             # Base de données (créée auto)
 ```
@@ -288,10 +289,10 @@ Steam RSS + Pocketpair Web Scraping
 - ✅ Retry exponentiel
 - **Durée**: 1 jour
 
-### PHASE 4: Monitoring serveur
-- `/server` command
-- `/players` command
-- Analytics uptime
+### PHASE 4: Monitoring serveur (TERMINÉE)
+- ✅ `/server` command
+- ✅ `/players` command
+- ✅ Analytics uptime
 - **Durée**: 2-3 jours
 
 ### PHASE 5+: Encyclopédie, Breeding, Admin

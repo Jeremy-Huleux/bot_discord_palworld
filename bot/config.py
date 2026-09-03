@@ -85,7 +85,16 @@ class Config:
 
     PALWORLD_API_URL: Optional[str] = os.getenv("PALWORLD_API_URL")
     PALWORLD_API_KEY: Optional[str] = os.getenv("PALWORLD_API_KEY")
+    PALWORLD_ADMIN_USER: str = os.getenv("PALWORLD_ADMIN_USER", "admin")
+    PALWORLD_ADMIN_PASSWORD: Optional[str] = os.getenv("PALWORLD_ADMIN_PASSWORD")
     PALWORLD_SERVER_URL: Optional[str] = os.getenv("PALWORLD_SERVER_URL")
+    PALWORLD_SERVER_HOST: Optional[str] = os.getenv("PALWORLD_SERVER_HOST")
+    PALWORLD_SERVER_PORT: int = int(os.getenv("PALWORLD_SERVER_PORT", "8211"))
+    PALWORLD_API_PORT: int = int(os.getenv("PALWORLD_API_PORT", "8212"))
+    PALWORLD_MAX_PLAYERS: int = int(os.getenv("PALWORLD_MAX_PLAYERS", "32"))
+    PALWORLD_SERVER_TIMEOUT: float = float(
+        os.getenv("PALWORLD_SERVER_TIMEOUT", "5")
+    )
 
     # ============================================================
     # LOGGING

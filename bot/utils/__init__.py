@@ -147,6 +147,12 @@ class EmbedBuilder:
 
         embed.add_field(name="📌 Version", value=status.version or "Unknown", inline=True)
 
+        embed.add_field(
+            name="⏱️ Uptime",
+            value=Formatter.format_uptime(status.uptime),
+            inline=True,
+        )
+
         if status.last_check:
             embed.add_field(name="🕐 Dernier check", value=status.last_check, inline=True)
 
