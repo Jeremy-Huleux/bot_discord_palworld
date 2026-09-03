@@ -5,3 +5,4 @@ aiohttp
 deep-translator
 beautifulsoup4
 python-a2s
+pytest
