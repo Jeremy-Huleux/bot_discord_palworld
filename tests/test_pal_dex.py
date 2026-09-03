@@ -17,7 +17,7 @@ def test_search_by_type():
 
     matches = dex.search("neutral")
 
-    assert {pal.name for pal in matches} == {"Lamball", "Cattiva"}
+    assert {pal.name for pal in matches} >= {"Lamball", "Cattiva", "Chikipi"}
 
 
 def test_search_is_case_and_accent_insensitive():

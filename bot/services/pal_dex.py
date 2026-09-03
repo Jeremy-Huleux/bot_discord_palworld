@@ -1,6 +1,8 @@
 """Local Pal encyclopedia service."""
 
 import unicodedata
+import json
+from pathlib import Path
 from typing import List, Optional
 
 from models import Pal
@@ -10,7 +12,15 @@ class PalDexService:
     """Search the local Pal catalog."""
 
     def __init__(self, pals: Optional[List[Pal]] = None):
-        self.pals = pals or self._default_pals()
+        self.pals = pals or self._load_pals()
+
+    @staticmethod
+    def _load_pals() -> List[Pal]:
+        path = Path(__file__).parent.parent / "data" / "catalog.json"
+        if path.exists():
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            return [Pal(**data) for data in payload.get("pals", [])]
+        return PalDexService._default_pals()
 
     def search(self, query: str) -> List[Pal]:
         """Return Pals whose name or type matches the query."""

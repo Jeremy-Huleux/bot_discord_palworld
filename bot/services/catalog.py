@@ -1,6 +1,8 @@
 """Local catalogs for Palworld items and bosses."""
 
 import unicodedata
+import json
+from pathlib import Path
 from typing import List, Optional
 
 from models import Boss, Item
@@ -10,8 +12,25 @@ class CatalogService:
     """Search local item and boss catalogs."""
 
     def __init__(self, items: Optional[List[Item]] = None, bosses: Optional[List[Boss]] = None):
-        self.items = items or self._default_items()
-        self.bosses = bosses or self._default_bosses()
+        self.items = items or self._load_items()
+        self.bosses = bosses or self._load_bosses()
+
+    @staticmethod
+    def _load_data() -> dict:
+        path = Path(__file__).parent.parent / "data" / "catalog.json"
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
+        return {}
+
+    @staticmethod
+    def _load_items() -> List[Item]:
+        data = CatalogService._load_data()
+        return [Item(**item) for item in data.get("items", [])] or CatalogService._default_items()
+
+    @staticmethod
+    def _load_bosses() -> List[Boss]:
+        data = CatalogService._load_data()
+        return [Boss(**boss) for boss in data.get("bosses", [])] or CatalogService._default_bosses()
 
     def search_items(self, query: str) -> List[Item]:
         return self._search(self.items, query)
