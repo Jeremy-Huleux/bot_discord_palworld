@@ -1,4 +1,7 @@
 import logging
+import asyncio
+import re
+import time
 import aiohttp
 import feedparser
 from bs4 import BeautifulSoup
@@ -42,6 +45,7 @@ class NewsService:
             if Config.TRANSLATION_ENABLED
             else None
         )
+        self.translation_cache = {}
 
         self.pocketpair = PocketpairService(database)
 
@@ -85,6 +89,26 @@ class NewsService:
 
         return "news"
 
+    @staticmethod
+    def _article_key(article: NewsArticle) -> str:
+        """Build a stable key for cross-source duplicate detection."""
+        title = re.sub(r"[^a-z0-9]+", " ", article.title.lower()).strip()
+        return title
+
+    def _is_known_article(self, article: NewsArticle, seen_keys: set[str]) -> bool:
+        """Check database and current batch for an already known article."""
+        if self.database.news_exists(article.guid):
+            return True
+        if article.url and self.database.news_url_exists(article.url):
+            return True
+
+        article_key = self._article_key(article)
+        if article_key and article_key in seen_keys:
+            return True
+
+        seen_keys.add(article_key)
+        return False
+
     async def _translate(self, text: str) -> str:
         """
         Safely translate text to French
@@ -98,11 +122,25 @@ class NewsService:
         if not text or not self.translator:
             return text
 
-        try:
-            return self.translator.translate(text)
-        except Exception as error:
-            logger.warning(f"Translation failed: {error}")
-            return text
+        now = time.monotonic()
+        cached = self.translation_cache.get(text)
+        if Config.CACHE_ENABLED and cached:
+            translated, cached_at = cached
+            if now - cached_at < Config.CACHE_TTL:
+                return translated
+            self.translation_cache.pop(text, None)
+
+        for attempt in range(3):
+            try:
+                translated = self.translator.translate(text)
+                if Config.CACHE_ENABLED:
+                    self.translation_cache[text] = (translated, now)
+                return translated
+            except Exception as error:
+                if attempt == 2:
+                    logger.warning(f"Translation failed: {error}")
+                    return text
+                await asyncio.sleep(2 ** attempt)
 
     def extract_details(
         self,
@@ -172,9 +210,6 @@ class NewsService:
                         if not guid:
                             continue
 
-                        if self.database.news_exists(guid):
-                            continue
-
                         raw_title = entry.get("title", "Sans titre")
 
                         raw_summary = entry.get(
@@ -203,7 +238,8 @@ class NewsService:
                             category=category,
                         )
 
-                        results.append(article)
+                        if not self._is_known_article(article, set()):
+                            results.append(article)
 
                 except Exception as error:
                     logger.error(f"Steam fetch error: {error}")
@@ -223,9 +259,12 @@ class NewsService:
         # STEAM
         # ============================================
 
+        seen_keys: set[str] = set()
         steam_news = await self.fetch_steam_news()
 
-        results.extend(steam_news)
+        for article in steam_news:
+            if not self._is_known_article(article, seen_keys):
+                results.append(article)
 
         # ============================================
         # POCKETPAIR
@@ -242,18 +281,29 @@ class NewsService:
                     news.title = await self._translate(news.title)
                     news.summary = await self._translate(news.summary or "")
 
-                results.append(news)
+                if not self._is_known_article(news, seen_keys):
+                    results.append(news)
 
         except Exception as error:
             logger.error(f"Pocketpair fetch error: {error}")
 
         return results
 
-    def mark_as_sent(self, guid: str):
+    def mark_as_sent(self, article: NewsArticle):
         """
         Mark an article as sent to Discord
         
         Args:
-            guid: Article unique identifier
+            article: Article that was sent to Discord
         """
-        self.database.mark_as_sent(guid)
+        self.database.save_news_pending(
+            guid=article.guid,
+            title=article.title,
+            url=article.url,
+            published=article.published or "",
+            source=article.source,
+            category=article.category,
+            summary=article.summary,
+            image=article.image,
+        )
+        self.database.mark_as_sent(article.guid)

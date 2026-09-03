@@ -588,6 +588,9 @@ class PocketpairService:
                     ):
                         continue
 
+                    if self.database.news_url_exists(url):
+                        continue
+
                     # =========================================
                     # ARTICLE
                     # =========================================

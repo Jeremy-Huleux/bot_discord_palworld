@@ -42,6 +42,10 @@ class NewsArticle:
             "sent_at": self.sent_at,
         }
 
+    def __getitem__(self, key: str):
+        """Support legacy dictionary-style field access."""
+        return self.to_dict()[key]
+
     def is_sent(self) -> bool:
         """Check if article has been sent to Discord"""
         return self.sent_at is not None
@@ -57,7 +61,7 @@ class Pal:
 
     id: int
     name: str
-    name_en: str
+    name_en: str = ""
     type: List[str] = field(default_factory=list)
     rarity: int = 1
     hp: int = 0

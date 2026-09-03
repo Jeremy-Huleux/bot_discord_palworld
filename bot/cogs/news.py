@@ -58,7 +58,7 @@ class NewsCog(commands.Cog):
     # AUTOMATIC VERIFICATION
     # =========================================================
 
-    @tasks.loop(minutes=5)
+    @tasks.loop(seconds=Config.NEWS_CHECK_INTERVAL)
     async def news_check(self):
 
         logger.info("Vérification des actualités Palworld...")
@@ -148,7 +148,7 @@ class NewsCog(commands.Cog):
             return False
 
         # Mark as sent in database
-        self.bot.news_service.mark_as_sent(article.guid)
+        self.bot.news_service.mark_as_sent(article)
 
         logger.info(f"News sent: {article.title}")
 

@@ -268,7 +268,7 @@ Steam RSS + Pocketpair Web Scraping
 
 ## 🗺️ Roadmap
 
-### PHASE 1: Stabilisation (EN COURS)
+### PHASE 1: Stabilisation (TERMINÉE)
 - ✅ Audit complet
 - ✅ Correction bug résumé Pocketpair
 - 🔧 Nettoyage doublons
@@ -276,16 +276,16 @@ Steam RSS + Pocketpair Web Scraping
 - 🔧 Logging structuré
 - **Durée**: 2-3 jours
 
-### PHASE 2: Architecture modulaire
-- Refactorisation config/logging
-- Dataclasses pour modèles
-- Tests unitaires
+### PHASE 2: Architecture modulaire (TERMINÉE)
+- ✅ Refactorisation config/logging
+- ✅ Dataclasses pour modèles
+- ✅ Tests unitaires
 - **Durée**: 1-2 jours
 
-### PHASE 3: News robustes
-- Intégrer résumé + image Pocketpair
-- Cache traduction
-- Retry exponential
+### PHASE 3: News robustes (TERMINÉE)
+- ✅ Intégrer résumé + image Pocketpair
+- ✅ Cache traduction
+- ✅ Retry exponentiel
 - **Durée**: 1 jour
 
 ### PHASE 4: Monitoring serveur

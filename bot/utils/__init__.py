@@ -124,13 +124,15 @@ class EmbedBuilder:
 
         color = discord.Color.green() if status.is_online else discord.Color.red()
         emoji = "🟢" if status.is_online else "🔴"
+        state = "EN LIGNE ✅" if status.is_online else "HORS LIGNE ❌"
 
         embed = discord.Embed(
             title=f"{emoji} Statut du Serveur Palworld",
+            description=state,
             color=color,
         )
 
-        state = "EN LIGNE ✅" if status.is_online else "HORS LIGNE ❌"
+
         embed.add_field(name="État", value=state, inline=False)
 
         embed.add_field(
