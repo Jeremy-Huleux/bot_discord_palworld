@@ -38,9 +38,56 @@ entrees selectionnees.
 
 ## Limites actuelles
 
-`repak` extrait les assets Unreal `.uasset` et `.uexp`, mais ne les convertit pas
-encore en JSON DataTables. La prochaine etape est d'evaluer un lecteur Unreal
-compatible avec ces assets, puis de produire `normalized/` et `validated/`.
+`repak` extrait les assets Unreal `.uasset` et `.uexp`. Le projet utilise ensuite
+UAssetAPI 1.1.0 pour décoder les DataTables avec `EngineVersion.VER_UE5_1` et
+produire les JSON normalisables. Les données générées restent hors du dépôt.
+
+## Résultat du prototype
+
+Le PAK du serveur a été lu avec `repak v0.2.3` :
+
+- format PAK `V11` ;
+- index non chiffré ;
+- compression Oodle ;
+- build Steam `24575149` ;
+- 372 entrées candidates dans les familles sélectionnées ;
+- 356 fichiers extraits dans le staging ;
+- environ 49 Mo extraits.
+
+Les familles suivantes sont présentes dans le PAK :
+
+- `DT_PalMonsterParameter` ;
+- `DT_PalCombiUnique` ;
+- `DT_PalDropItem` ;
+- `DT_ItemDataTable` ;
+- `DT_ItemRecipeDataTable` ;
+- `DT_PassiveSkill_Main` ;
+- `DT_PartnerSkill` ;
+- `DT_PalRaidBoss` ;
+- tables de textes EN et FR.
+
+Ces résultats prouvent que l'extraction primaire est faisable. Ils ne prouvent
+pas que toutes les propriétés possibles seront disponibles dans chaque build ;
+le prototype actuel décode toutefois les DataTables ciblées sans fichier `.usmap`.
+
+## Résultat du décodage
+
+Sur le build `24575149`, le convertisseur a produit 101 JSON à partir des assets
+extraits, sans échec. Les tables prioritaires contiennent notamment :
+
+| Table | Lignes |
+| --- | ---: |
+| `DT_PalMonsterParameter` | 737 |
+| `DT_PalCombiUnique` | 259 |
+| `DT_PalDropItem` | 1046 |
+| `DT_PassiveSkill_Main` | 574 |
+| `DT_PartnerSkillParameter` | 667 |
+| `DT_ItemRecipeDataTable` | 1 table décodée |
+| `DT_TechnologyRecipeUnlock` | 548 |
+
+Le projet .NET du convertisseur est dans `tools/uasset_exporter/`. Il ne doit
+jamais recevoir un PAK en écriture et ses sorties doivent rester dans un staging
+externe tel que `/tmp/palworld-data/`.
 
 Ne jamais copier le PAK, les assets extraits ou les donnees proprietaires dans le
 depot Git.
