@@ -158,6 +158,40 @@ class EmbedBuilder:
 
         return embed
 
+    @staticmethod
+    def item_embed(item: Item) -> discord.Embed:
+        """Build an item encyclopedia embed."""
+        embed = discord.Embed(
+            title=f"🧰 {item.name}",
+            description=item.description or "Aucune description disponible.",
+            color=discord.Color.orange(),
+        )
+        embed.add_field(name="Catégorie", value=item.category, inline=True)
+        embed.add_field(name="Rareté", value=str(item.rarity), inline=True)
+        if item.materials:
+            embed.add_field(name="Matériaux", value=", ".join(item.materials), inline=False)
+        if item.image:
+            embed.set_thumbnail(url=item.image)
+        return embed
+
+    @staticmethod
+    def boss_embed(boss: Boss) -> discord.Embed:
+        """Build a boss encyclopedia embed."""
+        embed = discord.Embed(
+            title=f"👑 {boss.name}",
+            description=boss.description or "Aucune description disponible.",
+            color=discord.Color.red(),
+        )
+        embed.add_field(name="Niveau", value=str(boss.level), inline=True)
+        embed.add_field(name="PV", value=str(boss.hp), inline=True)
+        embed.add_field(name="Type", value=boss.type or "Inconnu", inline=True)
+        embed.add_field(name="Lieu", value=boss.location or "Inconnu", inline=False)
+        if boss.rewards:
+            embed.add_field(name="Récompenses", value=", ".join(boss.rewards), inline=False)
+        if boss.image:
+            embed.set_thumbnail(url=boss.image)
+        return embed
+
 
 class ViewBuilder:
     """Helper class to build Discord Views (Buttons, Menus)"""
