@@ -1,3 +1,12 @@
+# Palworld proprietary files and data-engine outputs
+*.pak
+*.uasset
+*.uexp
+data/raw/
+data/normalized/
+data/validated/
+data/exports/
+game_data/
 .env
 __pycache__/
 *.pyc

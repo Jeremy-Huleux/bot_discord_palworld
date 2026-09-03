@@ -10,6 +10,7 @@ Bot Discord communautaire pour Palworld - Actualités, encyclopédie Palworld, m
 - [Lancement](#-lancement)
 - [Commandes](#-commandes)
 - [Architecture](#-architecture)
+- [Palworld Data Engine](#-palworld-data-engine)
 - [Roadmap](#-roadmap)
 - [Troubleshooting](#-troubleshooting)
 
@@ -34,6 +35,11 @@ Bot Discord communautaire pour Palworld - Actualités, encyclopédie Palworld, m
 ### En développement 🚧
 
 Voir [Roadmap](#-roadmap) pour le planning complet.
+
+> **Principe de données** : les données de gameplay de l'encyclopédie ne seront
+> activées qu'après extraction, validation et traçabilité depuis les fichiers
+> locaux du serveur Palworld. Les wikis, APIs communautaires et données inventées
+> ne sont pas des sources autorisées.
 
 ---
 
@@ -270,6 +276,249 @@ Steam RSS + Pocketpair Web Scraping
 
 ## 🗺️ Roadmap
 
+### PALWORLD DATA ENGINE — ÉTUDE VALIDÉE
+
+L'étude de faisabilité est terminée. L'implémentation démarrera après validation
+du prototype d'extraction décrit dans la section suivante.
+
+## 🧬 Palworld Data Engine
+
+Cette architecture fera de la base de données du jeu la source de vérité de
+l'encyclopédie Discord. Le projet n'embarque aucun fichier propriétaire du jeu.
+
+### 1. Fichiers Palworld disponibles
+
+Le serveur local contient actuellement :
+
+- `Pal/Content/Paks/Pal-LinuxServer.pak` (environ 4,8 Go) ;
+- `steamapps/appmanifest_2394010.acf` ;
+- `Manifest_UFSFiles_Linux.txt` ;
+- le binaire `PalServer-Linux-Shipping` ;
+- les configurations `PalWorldSettings.ini` ;
+- des sauvegardes `.sav`.
+
+Les DataTables, DataAssets et fichiers JSON ne sont pas encore exportés hors du
+PAK. Les sauvegardes représentent l'état d'une partie, pas les données statiques
+complètes du jeu.
+
+### 2. Version / Build détecté
+
+Le build Steam installé est `24575149`. La version REST annoncée par le serveur
+est `v1.0.3.101283`. Le PAK doit aussi être identifié par son hash SHA-256 lors
+de chaque extraction.
+
+### 3. Méthode d'extraction recommandée
+
+```text
+PAK en lecture seule
+      ↓
+Extraction Unreal
+      ↓
+data/raw/<game_build>/
+      ↓
+Normalisation
+      ↓
+Validation
+      ↓
+PostgreSQL staging
+      ↓
+Tests, comparaison et activation
+```
+
+L'extracteur travaillera toujours sur une copie ou un volume monté en lecture
+seule, jamais sur les fichiers originaux du serveur.
+
+### 4. Outil d'extraction recommandé
+
+`PalDataKit` est retenu comme outil de normalisation et de vérification, pas comme
+extracteur primaire. Sa documentation indique qu'il consomme déjà un dossier
+`PalworldDB/data/raw`.
+
+L'extracteur primaire reste à sélectionner après test sur le PAK local :
+
+- `UnrealPak` correspondant à la version Unreal ;
+- `repak` si compatible ;
+- un extracteur Unreal capable de produire les `.uasset`.
+
+### 5. Pourquoi cette méthode
+
+Elle garantit que les valeurs viennent du build réellement installé :
+
+```text
+Fichiers du serveur → extraction locale → données brutes → données validées
+```
+
+PalDataKit pourra ensuite résoudre les identifiants et produire des datasets
+dérivés, mais ses datasets publiés ne seront jamais utilisés comme source
+primaire.
+
+### 6. Données réellement disponibles
+
+À ce stade, seules la version, le build, les hashes, la configuration et les
+interfaces runtime sont accessibles directement. Les données suivantes doivent
+être recherchées dans les exports du PAK :
+
+- **Pals** : paramètres, types, statistiques, travail, skills, passifs, drops ;
+- **Items** : paramètres, catégories, descriptions et références ;
+- **Skills / passifs** : puissance, élément, cooldowns et effets ;
+- **Boss** : paramètres, niveaux, récompenses et références de zones ;
+- **Recipes / technology** : matériaux, stations et déblocages ;
+- **Drops** : loot tables et références d'items ;
+- **Locations / spawns** : zones, positions et règles d'apparition ;
+- **Breeding** : rangs, combinaisons, exceptions et règles spéciales.
+
+Une donnée non présente dans le build sera déclarée indisponible, jamais estimée.
+
+### 7. Données directement extraites
+
+Le premier prototype devra produire les exports bruts et un manifest contenant
+les tables, lignes, fichiers sources et hashes. Aucun gameplay ne sera importé
+avant cette étape.
+
+### 8. Données dérivables
+
+Les index de recherche, relations Pal/type, statistiques par niveau, résultats de
+breeding, graphes `/breed-to` et changelogs pourront être calculés à partir des
+données validées. Ils porteront la provenance `DERIVED_FROM_GAME_DATA` ou
+`CALCULATED_FROM_GAME_DATA`.
+
+### 9. Données impossibles à obtenir depuis les fichiers
+
+Certaines formules ou logiques peuvent rester indisponibles : capture complète,
+comportements natifs, valeurs dynamiques, assets chiffrés ou logique uniquement
+exécutée par le moteur. Le bot affichera alors :
+
+```text
+Donnée non disponible dans les fichiers du jeu analysés.
+```
+
+### 10. Architecture de la pipeline
+
+```text
+palworld
+      ↓ volume lecture seule
+palworld-data-updater
+      ↓
+raw → normalized → validated
+      ↓
+PostgreSQL staging → tests → PostgreSQL active
+```
+
+L'extraction, la normalisation et l'import ne doivent jamais bloquer le bot
+Discord.
+
+### 11. Architecture PostgreSQL
+
+Le futur schéma sera relationnel et versionné, avec notamment :
+
+`game_versions`, `data_sources`, `localizations`, `pals`, `pal_stats`,
+`pal_work_suitabilities`, `skills`, `passive_skills`, `items`, `recipes`,
+`technology`, `drops`, `spawn_locations`, `bosses`, `breeding_combinations`,
+`breeding_rules` et `data_changes`.
+
+Les commandes ne connaîtront jamais les tables SQL : elles passeront par des
+repositories puis des services métier.
+
+### 12. Architecture Docker
+
+L'architecture cible est :
+
+```text
+palworld ──(lecture seule)──> palworld-data-updater
+                                                   ↓
+                                            palworld-db
+                                                   ↑
+                                            palworld-bot
+```
+
+Un conteneur d'extraction séparé est recommandé pour isoler les traitements
+lourds et protéger le serveur de jeu.
+
+### 13. Versioning
+
+Chaque extraction conservera :
+
+```text
+game_version, game_build, extraction_date, extractor_version,
+dataset_hash, source_pak_hash, status
+```
+
+Les anciennes versions resteront disponibles et la version active ne sera jamais
+écrasée directement.
+
+### 14. Détection des mises à jour
+
+La détection utilisera d'abord le `buildid` Steam, puis le hash du PAK. La version
+REST et le binaire seront des informations secondaires. Aucun build inchangé ne
+sera réimporté inutilement.
+
+### 15. Validation des nouvelles données
+
+Les contrôles porteront sur les identifiants, doublons, types, références
+étrangères, recettes, drops, breeding, localisations, tables attendues et
+provenance. Un échec provoquera `IMPORT REFUSÉ` et conservera l'ancienne version.
+
+### 16. Rollback
+
+Chaque migration commencera par une sauvegarde. La nouvelle version sera importée
+en staging et activée uniquement après les tests. Un échec laissera la version
+active précédente inchangée.
+
+### 17. Calculateur de breeding
+
+Le calculateur actuel basé sur `breeding_power` est provisoire. Le calculateur
+final reposera exclusivement sur les règles extraites du jeu, notamment les
+combinaisons uniques, exceptions, genres et Pals spéciaux.
+
+### 18. Commandes Discord rendues possibles
+
+```text
+/pal  /pals  /breed  /breed-to  /items  /boss
+/passives  /skill  /recipe  /drops  /locations
+/stats  /partnerskill  /work
+```
+
+Chaque réponse affichera le build et la provenance des données lorsque ces
+informations seront disponibles.
+
+### 19. Sécurité / propriété des fichiers
+
+Le dépôt ne contiendra jamais de `.pak`, `.uasset`, archives du jeu ou dataset
+propriétaire brut. Les fichiers du serveur seront montés en lecture seule et les
+seuls artefacts versionnés seront le code, les schémas, les scripts, les tests,
+les manifests et les hashes.
+
+### 20. Risques techniques
+
+- compatibilité du PAK Linux avec l'extracteur choisi ;
+- chiffrement ou compression des assets ;
+- tables absentes du build dédié ;
+- changements de structure entre builds ;
+- volume et durée d'une extraction complète ;
+- données de breeding ou logique native non exportables ;
+- migration PostgreSQL encore à construire.
+
+### 21. Plan d'implémentation
+
+1. Prototype d'ouverture et d'extraction du PAK.
+2. Conservation des données brutes et manifest de provenance.
+3. Normalisation et validation indépendante.
+4. Schéma PostgreSQL et import staging.
+5. Comparaison, changelog et rollback.
+6. Repositories et services métier.
+7. Breeding basé sur les règles extraites.
+8. Updater Docker et notification Discord après activation.
+
+### 22. Première implémentation recommandée
+
+La prochaine étape est un prototype non destructif qui tente d'ouvrir le PAK,
+identifie les tables disponibles et produit uniquement `data/raw/<build>/` ainsi
+qu'un rapport. Aucune commande Discord ni base active ne sera reliée aux données
+tant que l'extraction et la validation ne sont pas démontrées.
+
+Le prototype est documenté dans
+[docs/palworld-data/extraction.md](docs/palworld-data/extraction.md).
+
 ### PHASE 1: Stabilisation (TERMINÉE)
 - ✅ Audit complet
 - ✅ Correction bug résumé Pocketpair
@@ -296,8 +545,13 @@ Steam RSS + Pocketpair Web Scraping
 - ✅ Analytics uptime
 - **Durée**: 2-3 jours
 
-### PHASE 5+: Encyclopédie, Breeding, Admin
-Voir l'audit complet pour détails.
+### PHASE 5: Encyclopédie, Breeding, Admin (EN COURS)
+- ✅ Recherche locale `/pals`
+- ✅ Catalogue local `/items` et `/boss`
+- ✅ Calculateur provisoire `/breeding`
+- ✅ Commandes `/admin config` et `/admin backup`
+- ⏳ Extraction depuis les fichiers réels du serveur
+- ⏳ Remplacement des données provisoires par les données validées
 
 **Estimation totale**: 15-20 jours pour toutes les phases
 
@@ -513,5 +767,5 @@ Les contributions sont bienvenues! Voir [CONTRIBUTING.md](./CONTRIBUTING.md) pou
 
 ---
 
-**Dernière mise à jour**: 2026-08-18
-**Statut**: 🚧 En développement (Phase 1)
+**Dernière mise à jour**: 2026-09-03
+**Statut**: 🚧 En développement (étude Data Engine terminée, prototype d'extraction à valider)
