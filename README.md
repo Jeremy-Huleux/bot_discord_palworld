@@ -208,7 +208,7 @@ Attendez le message:
 | Commande | Description |
 |----------|-------------|
 | `/ping` | Vérifier que le bot fonctionne |
-| `/pals <nom>` | Rechercher un Pal (prochainement) |
+| `/pals <nom>` | Rechercher un Pal dans l'encyclopédie locale |
 | `/items <nom>` | Rechercher un objet (prochainement) |
 | `/boss` | Liste des boss (prochainement) |
 | `/server` | Statut, version, joueurs et uptime du serveur Palworld |
