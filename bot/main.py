@@ -76,6 +76,14 @@ class PalworldBot(commands.Bot):
         except Exception as error:
             logger.error(f"❌ Erreur chargement cog 'catalog': {error}")
 
+        try:
+            await self.load_extension(
+                "cogs.admin"
+            )
+            logger.info("✅ Cog 'admin' chargé")
+        except Exception as error:
+            logger.error(f"❌ Erreur chargement cog 'admin': {error}")
+
         guild = discord.Object(
             id=Config.DISCORD_GUILD_ID
         )

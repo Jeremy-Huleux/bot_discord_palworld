@@ -219,8 +219,8 @@ Attendez le message:
 
 | Commande | Description |
 |----------|-------------|
-| `/admin config` | Configurer le bot (prochainement) |
-| `/admin backup` | Statut sauvegarde (prochainement) |
+| `/admin config` | Afficher la configuration non sensible |
+| `/admin backup` | Créer une sauvegarde de la base SQLite |
 
 ---
 
